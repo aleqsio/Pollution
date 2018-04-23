@@ -1,6 +1,6 @@
 %%%-------------------------------------------------------------------
 %%% @author Aleksander
-%%% @copyright (C) 2018, <COMPANY>
+%%% @copyright (C) 2018
 %%% @doc
 %%%
 %%% @end
@@ -93,20 +93,20 @@ getStationMean(exists, Type, Station) ->
   List = maps:values(maps:filter(fun({_, CType}, _) -> Type =:= CType end, Station#station.measurements)),
   case List of
     [] -> {error, "No mesurements"};
-    _ -> lists:sum(List) / length(List) end;
+    _ -> {ok,lists:sum(List) / length(List)} end;
 getStationMean(Name, Type, Monitor) -> case maps:is_key(Name, Monitor#monitor.stations) of
                                          false -> {error, "Such station does not exist"};
                                          true ->
                                            getStationMean(exists, Type, maps:get(Name, Monitor#monitor.stations)) end.
 
 
-getDailyMean(DateTime, Type, Monitor) -> AllMeasurements = maps:fold(fun(Station) ->
-  maps:to_list(Station#station.measurements) end, [], Monitor#monitor.stations),
-  MeasurementsFitting = lists:filter(fun({{KeyDateTime, KeyType}, _}) when DateTime =:= KeyDateTime; Type =:= KeyType ->
-    true;(_) -> false end, AllMeasurements),
+getDailyMean(DateTime, Type, Monitor) -> AllMeasurements = maps:fold(fun(_,Station,Acc) ->
+  maps:to_list(Station#station.measurements)++Acc end, [], Monitor#monitor.stations),
+  MeasurementsFitting = lists:map(fun({_,V})-> V end, lists:filter(fun({{KeyDateTime, KeyType}, _}) when DateTime =:= KeyDateTime; Type =:= KeyType ->
+    true;(_) -> false end, AllMeasurements)),
   case MeasurementsFitting of
     [] -> {error, "No measurements fitting criteria"};
-    _ -> lists:sum(MeasurementsFitting) / length(MeasurementsFitting) end.
+    _ -> {ok,lists:sum(MeasurementsFitting) / length(MeasurementsFitting)} end.
 
 
 getMaximumVariationStation(Type, Monitor) -> Stations = maps:values(Monitor#monitor.stations),
@@ -119,7 +119,7 @@ getMaximumVariationStation(exists, Type, List) ->
     Variation > Variation2 end, lists:filter(fun({ok, _}) -> true;(_) -> false end, Variations)),
   case FilteredVariations of
     [] -> {error, "No station with measurements matching criteria"};
-    [TopVariation | _] -> {ok, TopVariation}
+    [{ok,TopVariation} | _] -> {ok, TopVariation}
   end.
 
 getVariation(Type, Station) ->
