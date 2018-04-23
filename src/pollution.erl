@@ -115,10 +115,11 @@ getMaximumVariationStation(Type, Monitor) -> Stations = maps:values(Monitor#moni
     List -> getMaximumVariationStation(exists, Type, List) end.
 getMaximumVariationStation(exists, Type, List) ->
   Variations = lists:map(fun(Station) -> getVariation(Type, Station) end, List),
-  FilteredVariations = lists:sort(fun({_,Variation},{_,Variation2})->Variation>Variation2 end,lists:filter(fun({ok, _}) -> true;(_) -> false end, Variations)),
+  FilteredVariations = lists:sort(fun({_, Variation}, {_, Variation2}) ->
+    Variation > Variation2 end, lists:filter(fun({ok, _}) -> true;(_) -> false end, Variations)),
   case FilteredVariations of
     [] -> {error, "No station with measurements matching criteria"};
-    [TopVariation|_] -> {ok, TopVariation}
+    [TopVariation | _] -> {ok, TopVariation}
   end.
 
 getVariation(Type, Station) ->
@@ -126,6 +127,6 @@ getVariation(Type, Station) ->
     KeyType =:= Type end, maps:to_list(Station#station.measurements))),
   case Measurements of
     [] -> {error, "No measurements fitting criteria"};
-    _ -> {ok, {Station,lists:max(Measurements) - lists:min(Measurements)}}
+    _ -> {ok, {Station, lists:max(Measurements) - lists:min(Measurements)}}
   end.
 
