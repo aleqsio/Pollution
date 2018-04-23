@@ -10,7 +10,7 @@
 -author("Aleksander").
 
 %% API
--export([createMonitor/0, addStation/3, addValue/5, removeValue/4, getOneValue/4, getStationMean/3, getDailyMean/3, getMaximumVariationStation/1]).
+-export([createMonitor/0, addStation/3, addValue/5, removeValue/4, getOneValue/4, getStationMean/3, getDailyMean/3, getMaximumVariationStation/2]).
 
 %%createMonitor/0 - tworzy i zwraca nowy monitor zanieczyszczeń;
 %%addStation/3 - dodaje do monitora wpis o nowej stacji pomiarowej (nazwa i współrzędne geograficzne), zwraca zaktualizowany monitor;
@@ -92,7 +92,7 @@ getStationMean({_, _} = Location, Type, Monitor) ->
 getStationMean(exists, Type, Station) ->
   List = maps:values(maps:filter(fun({_, CType}, _) -> Type =:= CType end, Station#station.measurements)),
   case List of
-    [] -> {error, "no mesurements"};
+    [] -> {error, "No mesurements"};
     _ -> lists:sum(List) / length(List) end;
 getStationMean(Name, Type, Monitor) -> case maps:is_key(Name, Monitor#monitor.stations) of
                                          false -> {error, "Such station does not exist"};
@@ -105,10 +105,27 @@ getDailyMean(DateTime, Type, Monitor) -> AllMeasurements = maps:fold(fun(Station
   MeasurementsFitting = lists:filter(fun({{KeyDateTime, KeyType}, _}) when DateTime =:= KeyDateTime; Type =:= KeyType ->
     true;(_) -> false end, AllMeasurements),
   case MeasurementsFitting of
-    [] -> {error, "no mesurements"};
+    [] -> {error, "No measurements fitting criteria"};
     _ -> lists:sum(MeasurementsFitting) / length(MeasurementsFitting) end.
 
 
-getMaximumVariationStation(Monitor) ->
-  erlang:error(not_implemented).
+getMaximumVariationStation(Type, Monitor) -> Stations = maps:values(Monitor#monitor.stations),
+  case Stations of
+    [] -> {error, "No stations"};
+    List -> getMaximumVariationStation(exists, Type, List) end.
+getMaximumVariationStation(exists, Type, List) ->
+  Variations = lists:map(fun(Station) -> getVariation(Type, Station) end, List),
+  FilteredVariations = lists:sort(fun({_,Variation},{_,Variation2})->Variation>Variation2 end,lists:filter(fun({ok, _}) -> true;(_) -> false end, Variations)),
+  case FilteredVariations of
+    [] -> {error, "No station with measurements matching criteria"};
+    [TopVariation|_] -> {ok, TopVariation}
+  end.
+
+getVariation(Type, Station) ->
+  Measurements = lists:map(fun({{_, _}, Value}) -> Value end, lists:filter(fun({{_, KeyType}, _}) ->
+    KeyType =:= Type end, maps:to_list(Station#station.measurements))),
+  case Measurements of
+    [] -> {error, "No measurements fitting criteria"};
+    _ -> {ok, {Station,lists:max(Measurements) - lists:min(Measurements)}}
+  end.
 
