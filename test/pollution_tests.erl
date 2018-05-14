@@ -54,7 +54,8 @@ addValue_DuplicateMeasurement_FailToAdd_test() ->
 removeValue_ExistingMeasurement_AddToMonitor_test() ->
   M = pollution:createMonitor(),
   {ok, M1} = pollution:addStation("Station1", {0, 0}, M),
-  {ok, _} = pollution:removeValue("Station1", {{0, 0, 0}, {0, 0, 0}}, "T1", M1).
+  {ok, M2} = pollution:addValue("Station1", {{0, 0, 0}, {0, 0, 0}}, "T1", 100.0, M1),
+  {ok, _} = pollution:removeValue("Station1", {{0, 0, 0}, {0, 0, 0}}, "T1", M2).
 
 removeValue_NonExistingMeasurement_NoChange_test() ->
   M = pollution:createMonitor(),
