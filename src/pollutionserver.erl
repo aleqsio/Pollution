@@ -13,94 +13,80 @@
 
 -module(pollutionserver).
 -author("Aleksander").
-
+-behavior(gen_server).
 %% API
--export([start/0, init/0, stop/0, start_link/0, addStation/2, addValue/4, removeValue/3, getOneValue/3, getStationMean/2, getDailyMean/2, getMaximumVariationStation/1, getMonitor/0, crash/0]).
+-export([stop/0, start_link/1, addStation/2, addValue/4, removeValue/3, getOneValue/3, getStationMean/2, getDailyMean/2, getMaximumVariationStation/1, getMonitor/0, crash/0, init/1, handle_call/3, handle_cast/2]).
 
 
-start() ->
-  PID = spawn(?MODULE, init, []),
-  register(server, PID).
-
-start_link() ->
-  PID = spawn_link(?MODULE, init, []),
-  register(server, PID).
-
-init() ->
-  Monitor = pollution:createMonitor(),
-  loop(Monitor).
+start_link(_) ->
+  gen_server:start_link(
+    {local,server},
+    pollutionserver,
+    [], []).
 
 stop() ->
-  server ! stop,
-  unregister(server).
+  gen_server:stop(pollutionserver1).
 
-loop(Monitor) ->
-  receive
-    {Pid, getMonitor} -> Pid ! {ok, Monitor}, loop(Monitor);
-    {Pid, stop} -> Pid ! ok;
-    {Pid, addStation, Name, Location} ->
+getNewState(Monitor,Request) ->
+  case Request of
+    getMonitor ->{{ok, Monitor},Monitor};
+    {stop} -> Reply = ok;
+    {addStation, Name, Location} ->
       Result = pollution:addStation(Name, Location, Monitor),
-      Pid ! getSuccessState(Result),
       case Result of
-        {ok, UpdatedMonitor} -> loop(UpdatedMonitor);
-        _ -> loop(Monitor)
+        {ok, UpdatedMonitor} -> {ok,UpdatedMonitor};
+        error -> {error,Monitor}
       end;
 
-    {Pid, addValue, LocationOrName, DateTime, Type, Value} ->
+    {addValue, LocationOrName, DateTime, Type, Value} ->
       Result = pollution:addValue(LocationOrName, DateTime, Type, Value, Monitor),
-      Pid ! getSuccessState(Result),
       case Result of
-        {ok, UpdatedMonitor} -> loop(UpdatedMonitor);
-        _ -> loop(Monitor)
+        {ok, UpdatedMonitor} -> {ok,UpdatedMonitor};
+        error -> {error,Monitor}
       end;
-    {Pid, removeValue, LocationOrName, DateTime, Type} ->
+    {removeValue, LocationOrName, DateTime, Type} ->
       Result = pollution:removeValue(LocationOrName, DateTime, Type, Monitor),
-      Pid ! getSuccessState(Result),
       case Result of
-        {ok, UpdatedMonitor} -> loop(UpdatedMonitor);
-        _ -> loop(Monitor)
+        {ok, UpdatedMonitor} -> {ok,UpdatedMonitor};
+        error -> {error,Monitor}
       end;
-    {Pid, getOneValue, LocationOrName, DateTime, Type} ->
+    {getOneValue, LocationOrName, DateTime, Type} ->
       Result = pollution:getOneValue(LocationOrName, DateTime, Type, Monitor),
-      Pid ! Result,
-      loop(Monitor);
-    {Pid, getStationMean, LocationOrName, Type} ->
+      {Result,Monitor};
+    {getStationMean, LocationOrName, Type} ->
       Result = pollution:getStationMean(LocationOrName, Type, Monitor),
-      Pid ! Result,
-      loop(Monitor);
-    {Pid, getDailyMean, LocationOrName, Type} ->
+      {Result,Monitor};
+    {getDailyMean, LocationOrName, Type} ->
       Result = pollution:getDailyMean(LocationOrName, Type, Monitor),
-      Pid ! Result,
-      loop(Monitor);
-    {Pid, getMaximumVariationStation, Type} ->
+      {Result,Monitor};
+    {getMaximumVariationStation, Type} ->
       Result = pollution:getMaximumVariationStation(Type, Monitor),
-      Pid ! Result,
-      loop(Monitor);
-    {Pid, crash} -> ok
+      {Result,Monitor};
+    {crash} -> {error,Monitor}
   end.
 
 getSuccessState({ok, _}) -> ok;
 getSuccessState({error, Response}) -> {error, Response};
 getSuccessState(_) -> {error, "Server error"}.
 
-getMonitor() -> server ! {self(), getMonitor}, receiveResponse().
-addStation(Name, Location) -> server ! {self(), addStation, Name, Location}, receiveResponse().
-addValue(LocationOrName, DateTime, Type, Value) -> server ! {self(), addValue, LocationOrName, DateTime, Type, Value},
-  receiveResponse().
-removeValue(LocationOrName, DateTime, Type) -> server ! {self(), removeValue, LocationOrName, DateTime, Type},
-  receiveResponse().
-getOneValue(LocationOrName, DateTime, Type) -> server ! {self(), getOneValue, LocationOrName, DateTime, Type},
-  receiveResponse().
-getStationMean(LocationOrName, Type) -> server ! {self(), getStationMean, LocationOrName, Type}, receiveResponse().
-getDailyMean(LocationOrName, Type) -> server ! {self(), getDailyMean, LocationOrName, Type}, receiveResponse().
-getMaximumVariationStation(Type) -> server ! {self(), getMaximumVariationStation, Type}, receiveResponse().
-crash() -> server ! {self(), crash}, receiveResponse().
-receiveResponse() ->
-  receive
-    ok -> ok;
-    {ok, Result} -> {ok, Result};
-    {error, Response} -> {error, Response};
-    _ -> {error, malformed_data}
-  after
-    1000 -> {error, no_data}
-  end.
+getMonitor() -> gen_server:call(server,getMonitor).
+addStation(Name, Location) -> server ! {self(), addStation, Name, Location}.
+addValue(LocationOrName, DateTime, Type, Value) -> server ! {self(), addValue, LocationOrName, DateTime, Type, Value}.
+removeValue(LocationOrName, DateTime, Type) -> server ! {self(), removeValue, LocationOrName, DateTime, Type}.
+getOneValue(LocationOrName, DateTime, Type) -> server ! {self(), getOneValue, LocationOrName, DateTime, Type}.
+getStationMean(LocationOrName, Type) -> server ! {self(), getStationMean, LocationOrName, Type}.
+getDailyMean(LocationOrName, Type) -> server ! {self(), getDailyMean, LocationOrName, Type}.
+getMaximumVariationStation(Type) -> server ! {self(), getMaximumVariationStation, Type}.
+crash() -> server ! {self(), crash}.
+
+init(_) ->
+  Monitor = pollution:createMonitor(),
+  {ok,Monitor}.
+
+
+handle_call(Request, From, State) ->
+  {Reply,NewState}=getNewState(State,Request),
+  {reply,Reply,NewState}.
+
+handle_cast(Request, State) ->
+  erlang:error(not_implemented).
