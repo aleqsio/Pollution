@@ -62,12 +62,8 @@ getNewState(Monitor,Request) ->
     {getMaximumVariationStation, Type} ->
       Result = pollution:getMaximumVariationStation(Type, Monitor),
       {Result,Monitor};
-    {crash} -> {error,Monitor}
+    {crash} -> Result = {error,Monitor}
   end.
-
-getSuccessState({ok, _}) -> ok;
-getSuccessState({error, Response}) -> {error, Response};
-getSuccessState(_) -> {error, "Server error"}.
 
 getMonitor() -> gen_server:call(server,getMonitor).
 addStation(Name, Location) -> server ! {self(), addStation, Name, Location}.

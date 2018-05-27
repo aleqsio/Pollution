@@ -125,8 +125,7 @@ getMaximumVariationStation_OneMeasurement_ZeroVariation_test() ->
   "Station1" = Station#station.name,
   0.0 = Variation.
 
-
 getMaximumVariationStation_NoMeasurements_FailToAdd_test() ->
   M = pollution:createMonitor(),
   {ok, M1} = pollution:addStation("Station1", {0, 0}, M),
-  {error,"No station with measurements matching criteria"} = pollution:getMaximumVariationStation("T1", M1).
+  {error, "No station with measurements matching criteria"} = pollution:getMaximumVariationStation("T1", M1).

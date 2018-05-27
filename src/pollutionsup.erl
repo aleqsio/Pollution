@@ -20,7 +20,7 @@ start() ->
   register(supervisor, PID).
 init() ->
   process_flag(trap_exit, true),
-  pollutionserver:start_link(),
+  pollutionserver:start_link([]),
   receive
     {'EXIT', Pid, Reason} ->
       init()
